@@ -1,0 +1,13 @@
+[project]
+name = "cdc-streaming-warehouse"
+version = "0.1.0"
+description = "Change data capture from Postgres with Debezium and Kafka into an idempotent, SCD2 analytics warehouse"
+requires-python = ">=3.10"
+dependencies = ["duckdb>=1.1"]
+
+[project.optional-dependencies]
+kafka = ["confluent-kafka>=2.4"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

@@ -1,0 +1,36 @@
+# Full CDC stack: Postgres (logical replication) -> Debezium on Kafka Connect -> Redpanda -> Python sink -> DuckDB
+services:
+  postgres:
+    image: postgres:17
+    command: ["postgres", "-c", "wal_level=logical", "-c", "max_replication_slots=4", "-c", "max_wal_senders=4"]
+    environment: {POSTGRES_USER: shop, POSTGRES_PASSWORD: shop, POSTGRES_DB: shop}
+    ports: ["5434:5432"]
+    volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql:ro"]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U shop"], interval: 5s, retries: 20}
+
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.2.7
+    command: ["redpanda", "start", "--mode", "dev-container", "--smp", "1",
+              "--kafka-addr", "internal://0.0.0.0:9092,external://0.0.0.0:19092",
+              "--advertise-kafka-addr", "internal://redpanda:9092,external://localhost:19092"]
+    ports: ["19092:19092"]
+
+  connect:
+    image: quay.io/debezium/connect:2.7
+    depends_on: [redpanda, postgres]
+    environment:
+      BOOTSTRAP_SERVERS: redpanda:9092
+      GROUP_ID: cdc-connect
+      CONFIG_STORAGE_TOPIC: _connect_configs
+      OFFSET_STORAGE_TOPIC: _connect_offsets
+      STATUS_STORAGE_TOPIC: _connect_status
+      CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      STATUS_STORAGE_REPLICATION_FACTOR: 1
+    ports: ["8083:8083"]
+
+  console:
+    image: docker.redpanda.com/redpandadata/console:v2.7.2
+    depends_on: [redpanda]
+    environment: {KAFKA_BROKERS: redpanda:9092}
+    ports: ["8080:8080"]
